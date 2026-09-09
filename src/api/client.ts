@@ -1,4 +1,7 @@
-const API_ROOT = "/v1/mnp";
+const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
+const API_ROOT = `${API_ORIGIN}/v1/mnp`;
+
+export const apiUrl = (path: string) => `${API_ORIGIN}${path}`;
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -56,7 +59,7 @@ export async function personRequest<T>(path: string, init: RequestInit = {}): Pr
 }
 
 export async function adminLogin(email: string, password: string) {
-  const data = await fetchJson<{ access_token: string; email: string; role: string }>("/admin/auth/login", {
+  const data = await fetchJson<{ access_token: string; email: string; role: string }>(apiUrl("/admin/auth/login"), {
     method: "POST", headers: jsonHeaders, body: JSON.stringify({ email, password }),
   });
   localStorage.setItem(sessionStorageKeys.admin, data.access_token);
