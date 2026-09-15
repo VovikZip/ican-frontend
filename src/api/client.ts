@@ -66,18 +66,43 @@ export async function adminLogin(email: string, password: string) {
   return data;
 }
 
+export async function adminBootstrapStatus() {
+  return fetchJson<{ registration_open: boolean }>(apiUrl("/admin/auth/bootstrap/status"));
+}
+
+export async function bootstrapSuperAdmin(full_name: string, email: string, password: string) {
+  return fetchJson<{ id: number; email: string }>(apiUrl("/admin/auth/bootstrap"), {
+    method: "POST", headers: jsonHeaders,
+    body: JSON.stringify({ full_name, email, password, role: "super_admin" }),
+  });
+}
+
 export async function adminRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem(sessionStorageKeys.admin);
   if (!token) throw new ApiError("Потрібен вхід консультанта", 401);
   const response = await fetch(`${API_ROOT}${path}`, {
     ...init,
-    headers: { ...jsonHeaders, ...init.headers, Authorization: `Bearer ${token}` },
+    headers: { ...(init.body instanceof FormData ? {} : jsonHeaders), ...init.headers, Authorization: `Bearer ${token}` },
   });
   if (response.status === 401) {
     localStorage.removeItem(sessionStorageKeys.admin);
     window.dispatchEvent(new Event("console-session-expired"));
   }
   return decode<T>(response);
+}
+
+export async function adminDownload(path: string): Promise<Blob> {
+  const token = localStorage.getItem(sessionStorageKeys.admin);
+  if (!token) throw new ApiError("Потрібен вхід консультанта", 401);
+  const response = await fetch(`${API_ROOT}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) {
+    localStorage.removeItem(sessionStorageKeys.admin);
+    window.dispatchEvent(new Event("console-session-expired"));
+  }
+  if (!response.ok) await decode<never>(response);
+  return response.blob();
 }
 
 export const publicRequest = <T,>(path: string) => fetchJson<T>(`${API_ROOT}${path}`);
