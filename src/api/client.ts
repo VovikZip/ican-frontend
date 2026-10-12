@@ -31,6 +31,7 @@ const jsonHeaders = { "Content-Type": "application/json" };
 export const sessionStorageKeys = {
   user: "mnp_user_id",
   session: "mnp_session_token",
+  account: "mnp_user_account",
   admin: "mnp_admin_token",
 };
 
@@ -51,6 +52,13 @@ export async function personRequest<T>(path: string, init: RequestInit = {}): Pr
   });
   let response = await execute();
   if (response.status === 401) {
+    if (localStorage.getItem(sessionStorageKeys.account)) {
+      localStorage.removeItem(sessionStorageKeys.session);
+      localStorage.removeItem(sessionStorageKeys.user);
+      localStorage.removeItem(sessionStorageKeys.account);
+      window.dispatchEvent(new Event("user-session-expired"));
+      return decode<T>(response);
+    }
     localStorage.removeItem(sessionStorageKeys.session);
     token = await ensurePersonSession();
     response = await execute();
@@ -64,6 +72,30 @@ export async function adminLogin(email: string, password: string) {
   });
   localStorage.setItem(sessionStorageKeys.admin, data.access_token);
   return data;
+}
+
+export type UnifiedAuthResponse = {
+  account_type: "user" | "staff";
+  email: string;
+  role: string;
+  access_token?: string;
+  session_token?: string;
+  user_id?: string;
+};
+
+export async function unifiedLogin(email: string, password: string) {
+  return fetchJson<UnifiedAuthResponse>(`${API_ROOT}/auth/login`, {
+    method: "POST", headers: jsonHeaders, body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function registerUser(email: string, password: string) {
+  const existingSession = localStorage.getItem(sessionStorageKeys.session);
+  return fetchJson<UnifiedAuthResponse>(`${API_ROOT}/auth/register`, {
+    method: "POST",
+    headers: { ...jsonHeaders, ...(existingSession ? { Authorization: `Bearer ${existingSession}` } : {}) },
+    body: JSON.stringify({ email, password }),
+  });
 }
 
 export async function adminBootstrapStatus() {
